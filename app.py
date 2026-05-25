@@ -1,49 +1,28 @@
 import streamlit as st
-from openai import OpenAI
+import requests
 
-st.title("AI勉強計画アシスタント")
+st.title("📚 AI勉強計画アシスタント")
 
-# APIキーの設定
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+# StreamlitのSecretsからHugging Faceのキーを読み込む
+API_KEY = st.secrets["HUGGINGFACE_API_KEY"]
 
-# モデルの初期化
-if "openai_model" not in st.session_state:
-    st.session_state["openai_model"] = "gpt-4o-mini"
+# 使用するAIモデルを指定
+API_URL = "https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-8B-Instruct"
+headers = {"Authorization": f"Bearer {API_KEY}"}
 
-# チャット履歴の初期化
-if "messages" not in st.session_state:
-    st.session_state["messages"] = []
+prompt = st.text_input("勉強したい内容や目標を教えてください！")
 
-# 過去のメッセージを表示
-for message in st.session_state["messages"]:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-# ユーザーからの入力を受け付ける
-if prompt := st.chat_input("勉強したい内容や目標を教えてください！"):
-    # ユーザーの入力を履歴に追加して画面に表示
-    st.session_state["messages"].append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
-
-    # AIの返答を生成して表示
-    with st.chat_message("assistant"):
-        # システムプロンプト（指示書き）を英語で安全に渡す
-        messages_to_send = [
-            {"role": "system", "content": "You are a professional study planner. Please create a detailed and encouraging study plan based on the user's request. Respond in Japanese."}
-        ] + [
-            {"role": m["role"], "content": m["content"]} for m in st.session_state["messages"]
-        ]
-
-        # APIを呼び出してテキストとして取得（streamは使わない安全な方法）
-        response = client.chat.completions.create(
-            model=st.session_state["openai_model"],
-            messages=messages_to_send
-        )
-        
-        answer = response.choices[0].message.content
-        st.markdown(answer)
+if prompt:
+    # AIへの話し掛け方を調整する
+    payload = {
+        "inputs": f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\nあなたは親切な勉強のアシスタントです。日本語で回答してください。<|eot_id|><|start_header_id|>user<|end_header_id|>\n{prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n",
+        "parameters": {"max_new_tokens": 500, "return_full_text": False}
+    }
     
-    # AIの返答も履歴に追加
-    st.session_state["messages"].append({"role": "assistant", "content": answer})
-
+    with st.spinner("AIが考えています..."):
+        response = requests.post(API_URL, headers=headers, json=payload)
+        
+        if response.status_code == 200:
+            result = response.json()
+            # 返ってきたテキストを表示
+            st.write(result[0]['generated_text'])
