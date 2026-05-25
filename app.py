@@ -4,7 +4,10 @@ from openai import OpenAI
 st.title("AI勉強計画アシスタント")
 
 # APIキーの設定
-client = HUGGINGFACE(api_key=st.secrets["HUGGINGFACE_API_KEY"])
+API_KEY=st.secrets["HUGGINGFACE_API_KEY"])
+
+API_URL = "https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-8B-Instruct"
+headers = {"Authorization": f"Bearer {API_KEY}"}
 
 # モデルの初期化
 if "hugginhface_model" not in st.session_state:
