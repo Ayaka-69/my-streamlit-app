@@ -1,37 +1,49 @@
-from openai import OpenAI
 import streamlit as st
+from openai import OpenAI
 
-st.title("📚 AI勉強計画アシスタント")
+st.title("AI勉強計画アシスタント")
 
+# APIキーの設定
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
+# モデルの初期化
 if "openai_model" not in st.session_state:
-    st.session_state["openai_model"] = "gpt-3.5-turbo"
+    st.session_state["openai_model"] = "gpt-4o-mini"
 
+# チャット履歴の初期化
 if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {"role": "system", "content": "あなたは勉強計画を一緒に立ててくれる優秀なAIアシスタントです。ユーザーの目標、スケジュール、得意・不得意を聞きながら、具体的な勉強計画を提案してください。"}
-    ]
+    st.session_state["messages"] = []
 
-# チャット履歴を表示（systemメッセージは除く）
-for message in st.session_state.messages:
-    if message["role"] != "system":
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+# 過去のメッセージを表示
+for message in st.session_state["messages"]:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
+# ユーザーからの入力を受け付ける
 if prompt := st.chat_input("勉強したい内容や目標を教えてください！"):
-    st.session_state.messages.append({"role": "user", "content": prompt})
+    # ユーザーの入力を履歴に追加して画面に表示
+    st.session_state["messages"].append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
+    # AIの返答を生成して表示
     with st.chat_message("assistant"):
-        stream = client.chat.completions.create(
+        # システムプロンプト（指示書き）を英語で安全に渡す
+        messages_to_send = [
+            {"role": "system", "content": "You are a professional study planner. Please create a detailed and encouraging study plan based on the user's request. Respond in Japanese."}
+        ] + [
+            {"role": m["role"], "content": m["content"]} for m in st.session_state["messages"]
+        ]
+
+        # APIを呼び出してテキストとして取得（streamは使わない安全な方法）
+        response = client.chat.completions.create(
             model=st.session_state["openai_model"],
-            messages=[
-                {"role": m["role"], "content": m["content"]}
-                for m in st.session_state.messages
-            ],
-            stream=True,
+            messages=messages_to_send
         )
-        response = st.write_stream(stream)
-    st.session_state.messages.append({"role": "assistant", "content": response})
+        
+        answer = response.choices[0].message.content
+        st.markdown(answer)
+    
+    # AIの返答も履歴に追加
+    st.session_state["messages"].append({"role": "assistant", "content": answer})
+
